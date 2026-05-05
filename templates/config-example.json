@@ -1,0 +1,72 @@
+{
+  "title": "基于CNN的CIFAR-10图像分类实验",
+  "student_name": "张三",
+  "student_id": "20240000001",
+  "class_name": "24数据科学与大数据技术",
+  "teacher": "李四",
+  "course": "深度学习",
+  "college": "计算机学院",
+  "date": "2026年5月5日",
+  "semester": "2025-2026 学年第 2 学期",
+  "output_path": "实验报告.docx",
+  "sections": {
+    "purpose": "本实验旨在通过构建卷积神经网络（CNN）模型，实现对CIFAR-10数据集的图像分类任务。\n\n通过本实验，学生应掌握以下内容：\n1. 卷积神经网络的基本原理和结构设计\n2. PyTorch深度学习框架的基本使用方法\n3. 模型训练、验证和测试的完整流程\n4. 损失函数和优化器的选择策略\n5. 模型性能评估和分析方法",
+    "references": "1. Krizhevsky, A., et al. 'ImageNet Classification with Deep Convolutional Neural Networks.' NeurIPS, 2012.\n2. Simonyan, K., and Zisserman, A. 'Very Deep Convolutional Networks for Large-Scale Image Recognition.' ICLR, 2015.\n3. PyTorch官方文档: https://pytorch.org/docs/stable/\n4. CIFAR-10数据集: https://www.cs.toronto.edu/~kriz/cifar.html",
+    "tasks": "1. 使用PyTorch搭建一个VGG风格的CNN模型\n2. 在CIFAR-10数据集上进行模型训练\n3. 绘制训练过程中的Loss和Accuracy曲线\n4. 在测试集上评估模型性能\n5. 可视化部分测试样本的预测结果",
+    "content": "4.1 实验环境搭建与问题分析\n\n本实验使用Python 3.10 + PyTorch 2.0环境进行开发和训练。硬件环境为NVIDIA GPU，使用CUDA加速训练过程。\n\n在环境搭建过程中，首先需要安装PyTorch框架。通过pip install torch torchvision命令完成安装。安装完成后，通过torch.cuda.is_available()验证CUDA是否可用。\n\n4.2 数据集与预处理方法\n\nCIFAR-10数据集包含60000张32x32的彩色图像，分为10个类别，每个类别6000张。其中训练集50000张，测试集10000张。\n\n数据预处理步骤包括：\n- 将图像转换为Tensor格式\n- 使用均值(0.4914, 0.4822, 0.4465)和标准差(0.2470, 0.2435, 0.2616)进行归一化\n- 训练集使用随机水平翻转和随机裁剪进行数据增强\n\n4.3 模型结构设计\n\n本实验采用VGG风格的CNN模型，包含3个卷积块，每个卷积块由两个卷积层、BatchNorm层和ReLU激活函数组成，最后通过全连接层进行分类。\n\n模型结构如下：\n- Conv Block 1: Conv2d(3,64) -> BN -> ReLU -> Conv2d(64,64) -> BN -> ReLU -> MaxPool\n- Conv Block 2: Conv2d(64,128) -> BN -> ReLU -> Conv2d(128,128) -> BN -> ReLU -> MaxPool\n- Conv Block 3: Conv2d(128,256) -> BN -> ReLU -> Conv2d(256,256) -> BN -> ReLU -> MaxPool\n- FC: Linear(256*4*4, 512) -> ReLU -> Dropout(0.5) -> Linear(512, 10)\n\n4.4 训练策略与优化方法\n\n超参数设置：\n- 学习率: 0.001\n- Batch Size: 128\n- Epochs: 50\n- 优化器: Adam\n- 权重衰减: 1e-4\n\n使用CrossEntropyLoss作为损失函数，Adam优化器进行参数更新。\n\n4.5 模型训练过程分析\n\n训练初期（Epoch 1-10），模型损失快速下降，准确率从随机水平（约10%）迅速提升至60%以上。\n\n训练中期（Epoch 10-30），损失继续下降但速度放缓，准确率稳步提升至80%以上。\n\n训练后期（Epoch 30-50），模型逐渐收敛，损失和准确率趋于稳定。",
+    "results": "5.1 损失函数变化分析\n\n从训练过程来看，训练集损失从初始的2.30下降至最终的0.15，呈现出明显的下降趋势。测试集损失从2.28下降至0.65，整体趋势与训练集一致。\n\n训练集和测试集损失差距在训练后期有所增大，说明模型存在一定程度的过拟合，但整体泛化能力仍然较好。\n\n5.2 准确率变化分析\n\n训练集准确率从初始的10.2%提升至最终的96.5%，测试集准确率从10.5%提升至88.3%。\n\n最佳测试准确率为88.3%，超过了80%的目标要求，说明模型结构设计和超参数选择较为合理。\n\n5.3 分类结果分析\n\n从测试集前8张图像的预测结果来看，模型对大部分图像的分类是正确的。对于分类错误的样本，部分图像存在一定的模糊性或属于容易混淆的类别。\n\n5.4 模型泛化能力分析\n\n训练集与测试集准确率差距约为8%，说明模型存在一定程度的过拟合。通过Dropout和数据增强等正则化手段，有效缓解了过拟合问题。\n\n5.5 模型优化策略效果分析\n\nBatchNorm的使用加速了模型收敛，数据增强提升了模型的泛化能力，Adam优化器的自适应学习率特性使得训练过程更加稳定。\n\n5.6 综合评价\n\n本实验成功构建了VGG风格的CNN模型，在CIFAR-10数据集上达到了88.3%的测试准确率，超过了80%的目标要求。模型结构合理，训练过程稳定，泛化能力较好。",
+    "thought_questions": "1. 为什么选择Adam优化器而不是SGD？\n\nAdam优化器结合了动量法和RMSProp的优点，能够自适应地调整学习率，对于不同的参数使用不同的更新步长。在本实验中，Adam优化器的收敛速度明显快于SGD，且不需要手动调整学习率策略。\n\n2. BatchNorm的作用是什么？\n\nBatchNorm通过对每个mini-batch的输入进行归一化处理，解决了内部协变量偏移问题。它的主要作用包括：加速训练收敛、允许使用更大的学习率、起到一定的正则化效果。\n\n3. Dropout为什么能防止过拟合？\n\nDropout通过在训练过程中随机丢弃一部分神经元，使得网络不能过度依赖某些特定的神经元，从而增强了模型的泛化能力。这相当于训练了多个不同的子网络，最终通过集成效应提升模型性能。"
+  },
+  "images": [
+    {
+      "path": "output/curves.png",
+      "caption": "图 1 训练Loss与Accuracy曲线",
+      "section": "results"
+    },
+    {
+      "path": "output/predictions.png",
+      "caption": "图 2 测试集预测结果",
+      "section": "content"
+    }
+  ],
+  "tables": [
+    {
+      "caption": "表 1 模型超参数配置",
+      "section": "content",
+      "position": "start",
+      "headers": ["超参数", "值", "说明"],
+      "rows": [
+        ["学习率", "0.001", "Adam默认初始学习率"],
+        ["Batch Size", "128", "兼顾训练速度和显存占用"],
+        ["Epochs", "50", "足够模型收敛"],
+        ["优化器", "Adam", "自适应学习率"],
+        ["权重衰减", "1e-4", "L2正则化"]
+      ]
+    },
+    {
+      "caption": "表 2 模型结构对比",
+      "section": "content",
+      "headers": ["层类型", "输出尺寸", "参数量"],
+      "rows": [
+        ["Conv2d-1", "64x32x32", "1,792"],
+        ["Conv2d-2", "64x32x32", "36,928"],
+        ["MaxPool", "64x16x16", "0"],
+        ["Conv2d-3", "128x16x16", "73,856"],
+        ["Conv2d-4", "128x16x16", "147,584"],
+        ["MaxPool", "128x8x8", "0"],
+        ["FC-1", "512", "524,800"],
+        ["FC-2", "10", "5,130"]
+      ]
+    },
+    {
+      "caption": "表 3 性能对比",
+      "section": "results",
+      "headers": ["指标", "训练集", "测试集"],
+      "rows": [
+        ["最终损失", "0.15", "0.65"],
+        ["最终准确率", "96.5%", "88.3%"],
+        ["最佳准确率", "-", "88.3%"]
+      ]
+    }
+  ]
+}

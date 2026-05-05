@@ -1,0 +1,32 @@
+{
+  "name": "experiment-report-gen",
+  "version": "1.0.1",
+  "description": "深度学习实验报告生成器 - 从 config.json 生成标准格式的 .docx 实验报告，支持训练结果自动分析",
+  "main": "src/generate-report.js",
+  "bin": {
+    "experiment-report": "./bin/experiment-report.js"
+  },
+  "files": [
+    "src/",
+    "bin/",
+    "SKILL.md",
+    "templates/"
+  ],
+  "scripts": {
+    "test": "node bin/experiment-report.js --help"
+  },
+  "keywords": [
+    "experiment-report",
+    "docx",
+    "deep-learning",
+    "pytorch",
+    "report-generator",
+    "word-document",
+    "academic"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "docx": "^9.6.1"
+  }
+}
