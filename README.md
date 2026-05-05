@@ -7,9 +7,24 @@
 
 ## 安装
 
+### 方式一：npm 安装（需要发布到 npm）
+
 ```bash
 npm install -g experiment-report-gen
 ```
+
+### 方式二：从 GitHub 下载 zip 安装
+
+1. 下载 [experiment-report-gen.zip](https://github.com/wzsccy/experiment-report-gen/archive/refs/heads/master.zip)
+2. 解压到任意目录
+3. 在解压目录中运行：
+
+```bash
+npm install
+npm install -g .
+```
+
+安装完成后即可在任意位置使用 `experiment-report` 命令。
 
 ## 功能
 
