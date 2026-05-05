@@ -26,6 +26,32 @@ npm install -g .
 
 安装完成后即可在任意位置使用 `experiment-report` 命令。
 
+## Claude Code Skill
+
+本包内置了 Claude Code skill（`SKILL.md`），安装后可配合 Claude Code 使用，自动完成从实验要求到报告的全流程。
+
+### 安装 skill
+
+```bash
+# 从 npm 包中复制 skill
+mkdir -p .claude/skills/experiment-report
+cp $(npm root -g)/experiment-report-gen/SKILL.md .claude/skills/experiment-report/
+```
+
+或从 GitHub 下载：
+
+```bash
+mkdir -p .claude/skills/experiment-report
+curl -o .claude/skills/experiment-report/SKILL.md https://raw.githubusercontent.com/wzsccy/experiment-report-gen/master/SKILL.md
+```
+
+### 使用
+
+在 Claude Code 中描述你的实验需求即可触发：
+
+- "帮我生成实验报告，要求用CNN在CIFAR-10上做图像分类"
+- "实验要求.txt在这里，帮我完成实验"
+
 ## 功能
 
 - 从 `config.json` 生成格式化的 Word 报告（含封面、正文、表格、图片）

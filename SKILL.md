@@ -7,6 +7,18 @@ description: "自动化深度学习实验流程：根据实验要求文件（.tx
 
 将实验要求文件转换为可运行的 PyTorch 训练代码 + 标准格式的 docx 实验报告。
 
+## 前置条件
+
+需要全局安装 `experiment-report-gen` npm 包：
+
+```bash
+npm install -g experiment-report-gen
+```
+
+安装后可使用两个 CLI 命令：
+- `experiment-report generate <config.json>` — 从配置文件生成 .docx 报告
+- `experiment-report analyze <results.json> [--type image|text|auto]` — 从 results.json 自动生成分析文本
+
 ## 参考模板
 
 参考已有的报告模板和封面模板，理解格式、内容深度和排版风格。
@@ -75,8 +87,10 @@ conda activate myvenv && python train.py 2>&1 | tee output/train.log
 ### 4a. 从 results.json 自动生成分析文本
 
 ```bash
-conda activate myvenv && python <skill-dir>/scripts/analyze_results.py <project-dir>/output/results.json --type image|text|auto
+experiment-report analyze <project-dir>/output/results.json --type image|text|auto
 ```
+
+命令会自动检测实验类型（图像分类/文本分类）并输出分析文本到 stdout，可直接用于 config.json 的 sections.results。
 
 ### 4b. 准备 config.json（内容总字数不少于 5000 字）
 
@@ -163,13 +177,11 @@ conda activate myvenv && python <skill-dir>/scripts/analyze_results.py <project-
 - 结合实验数据和深度学习理论
 - 有理有据，分点论述
 
-### 4c. 调用脚本生成 docx
+### 4c. 调用 npm 包生成 docx
 
 ```bash
-node <skill-dir>/scripts/generate_report.js <config-json-path>
+experiment-report generate <config-json-path>
 ```
-
-脚本所在目录：`D:\Project\AI-DeepLearning\.claude\skills\experiment-report\scripts\`
 
 ### config.json 完整格式
 
