@@ -187,6 +187,7 @@ experiment-report generate <config-json-path>
 
 ```json
 {
+  "cover_template": null,
   "title": "实验标题",
   "student_name": "张三",
   "student_id": "20240000001",
@@ -205,7 +206,7 @@ experiment-report generate <config-json-path>
     "thought_questions": "500+字的思考题解答..."
   },
   "images": [
-    { "path": "output/curves.png", "caption": "图 1 训练Loss与Accuracy曲线", "section": "results" },
+    { "path": "output/curves.png", "caption": "图 1 训练Loss与Accuracy曲线", "explain": "解释文字...", "section": "results" },
     { "path": "output/predictions.png", "caption": "图 2 测试集预测结果", "section": "content" }
   ],
   "tables": [
@@ -213,6 +214,7 @@ experiment-report generate <config-json-path>
       "caption": "表 1 模型结构对比",
       "section": "content",
       "position": "start",
+      "explain": "解释文字...",
       "headers": ["组件", "模型A", "模型B"],
       "rows": [
         ["嵌入维度", "128", "64"],
@@ -231,28 +233,36 @@ experiment-report generate <config-json-path>
 }
 ```
 
+**封面模板 (cover_template)：**
+- 设为 `null` 使用自动生成的封面
+- 设为 docx 文件路径（如 `"../First/实验报告样本.docx"`）则提取该文件的封面页，替换正文内容生成报告
+- 路径相对于 config.json 所在目录
+
 **图片配置说明：**
 - `images` 是数组格式（不是对象）
 - `section` 可选值：`content`（嵌入4.x节末尾）、`results`（嵌入5.x节末尾）
+- `explain` 可选：图片下方的解释文字，对图表进行分析说明
 - 图片找不到时脚本会跳过并警告
 
 **表格配置说明：**
 - `tables` 是数组格式，每个表格包含 `caption`（标题）、`headers`（表头数组）、`rows`（数据二维数组）
 - `section` 指定表格属于哪个章节：`content`（嵌入4.x节）、`results`（嵌入5.x节）
 - `position` 可选：`start`（紧跟章节标题之后）、默认为 `end`（正文之后、图片之前）
-- 表格自动带蓝色表头背景、居中对齐、边框
+- `explain` 可选：表格下方的解释文字，对数据进行分析说明
+- 表格居中对齐、带边框
 - **必须添加数据表格**：模型对比表、超参数表、数据集统计表、性能对比表、训练过程表等
 - 从 `results.json` 中提取实际数值填充表格，确保数据准确
 
 ## 报告格式标准
 
-### 封面页（纯段落，非表格）
-参考 `实验报告样本.docx` 的段落格式：
-- 学院名称（居中）
-- 实 验 报 告（居中）
-- 学期（居中）
-- 课程/实验名称/班级/姓名学号/同组成员/评阅教师（左对齐，标签与值之间用空格分隔）
-- 日期（居中）
+### 封面页
+- **使用封面模板**：设置 `cover_template` 为已有报告的 docx 路径，自动提取封面页并替换正文
+- **自动生成封面**（无模板时）：纯段落格式，参考 `实验报告样本.docx`：
+  - 学院名称（居中）
+  - 实 验 报 告（居中）
+  - 学期（居中）
+  - 课程/实验名称/班级/姓名学号/同组成员/评阅教师（左对齐，标签与值之间用空格分隔）
+  - 日期（居中）
 
 ### 正文页
 - 实验标题（居中）

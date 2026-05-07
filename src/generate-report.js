@@ -5,6 +5,11 @@
  *   1. 通用模式 (mode: "generic") - 完全自定义封面、章节结构
  *   2. 实验报告模式 (默认) - 向后兼容原有实验报告格式
  *
+ * v2.0 新增:
+ *   - cover_template: 使用模板 docx 的封面页
+ *   - explain: 表格和图片后的解释文字
+ *   - 表格无蓝色表头，居中显示
+ *
  * 用法:
  *   const { generateReport } = require('experiment-report-gen');
  *   generateReport('config.json').then(() => console.log('done'));
@@ -12,6 +17,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   ImageRun, AlignmentType, BorderStyle, WidthType,
@@ -22,11 +28,13 @@ const {
 const SINGLE_BORDER = { style: BorderStyle.SINGLE, size: 1, color: '000000' };
 const SINGLE_BORDERS = { top: SINGLE_BORDER, bottom: SINGLE_BORDER, left: SINGLE_BORDER, right: SINGLE_BORDER };
 
+const FONT = { ascii: 'Times New Roman', eastAsia: '宋体' };
+
 function p(text, opts = {}) {
   return new Paragraph({
     alignment: opts.align || AlignmentType.LEFT,
     spacing: { before: opts.spaceBefore || 0, after: opts.spaceAfter || 0, line: opts.lineSpacing || 360 },
-    children: [new TextRun({ text, font: opts.font || { ascii: 'Times New Roman', eastAsia: '宋体' }, size: opts.size || 24, bold: opts.bold || false })],
+    children: [new TextRun({ text, font: opts.font || FONT, size: opts.size || 24, bold: opts.bold || false })],
   });
 }
 
@@ -35,8 +43,8 @@ function pMulti(runs, opts = {}) {
     alignment: opts.align || AlignmentType.LEFT,
     spacing: { before: opts.spaceBefore || 0, after: opts.spaceAfter || 0, line: opts.lineSpacing || 360 },
     children: runs.map(r => {
-      if (typeof r === 'string') return new TextRun({ text: r, font: { ascii: 'Times New Roman', eastAsia: '宋体' }, size: 24 });
-      return new TextRun({ font: { ascii: 'Times New Roman', eastAsia: '宋体' }, size: 24, ...r });
+      if (typeof r === 'string') return new TextRun({ text: r, font: FONT, size: 24 });
+      return new TextRun({ font: FONT, size: 24, ...r });
     }),
   });
 }
@@ -47,8 +55,8 @@ function coverInfoLine(label, value) {
   return new Paragraph({
     spacing: { before: 60, after: 60, line: 360 },
     children: [
-      new TextRun({ text: label, font: { ascii: 'Times New Roman', eastAsia: '宋体' }, size: 24 }),
-      new TextRun({ text: '\t' + (value || ''), font: { ascii: 'Times New Roman', eastAsia: '宋体' }, size: 24 }),
+      new TextRun({ text: label, font: FONT, size: 24 }),
+      new TextRun({ text: '\t' + (value || ''), font: FONT, size: 24 }),
     ],
     tabStops: [{ type: TabStopType.LEFT, position: 2400 }],
   });
@@ -64,7 +72,7 @@ function textToParagraphs(text, fontSize = 24) {
         result.push(new Paragraph({
           spacing: { after: 80, line: 360 },
           indent: { firstLine: 480 },
-          children: [new TextRun({ text: line.trim(), font: { ascii: 'Times New Roman', eastAsia: '宋体' }, size: fontSize })],
+          children: [new TextRun({ text: line.trim(), font: FONT, size: fontSize })],
         }));
       }
     }
@@ -72,15 +80,26 @@ function textToParagraphs(text, fontSize = 24) {
   return result;
 }
 
+function explainParagraph(text) {
+  if (!text) return [];
+  return [new Paragraph({
+    spacing: { after: 200, line: 360 },
+    indent: { firstLine: 480 },
+    children: [new TextRun({ text, font: FONT, size: 24 })],
+  })];
+}
+
+// ── 数据表格（无蓝色表头，居中）─────────────────────
+
 function createDataTable(tableConfig) {
-  const { caption, headers, rows } = tableConfig;
+  const { caption, headers, rows, explain } = tableConfig;
   const paragraphs = [];
 
   if (caption) {
     paragraphs.push(new Paragraph({
       spacing: { before: 200, after: 100 },
       alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: caption, bold: true, font: { ascii: 'Times New Roman', eastAsia: '宋体' }, size: 21 })],
+      children: [new TextRun({ text: caption, bold: true, font: FONT, size: 21 })],
     }));
   }
 
@@ -89,18 +108,18 @@ function createDataTable(tableConfig) {
   const colWidths = Array(colCount).fill(colWidth);
   colWidths[colCount - 1] = 9000 - colWidth * (colCount - 1);
 
+  // 表头行（无蓝色背景，仅加粗）
   const headerRow = new TableRow({
     tableHeader: true,
     children: headers.map((h, idx) => new TableCell({
       borders: SINGLE_BORDERS,
       width: { size: colWidths[idx], type: WidthType.DXA },
-      shading: { type: ShadingType.SOLID, color: 'D9E2F3' },
       verticalAlign: 'center',
       margins: { top: 40, bottom: 40, left: 80, right: 80 },
       children: [new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { after: 0 },
-        children: [new TextRun({ text: h, bold: true, font: { ascii: 'Times New Roman', eastAsia: '宋体' }, size: 21 })],
+        children: [new TextRun({ text: h, bold: true, font: FONT, size: 21 })],
       })],
     })),
   });
@@ -115,7 +134,7 @@ function createDataTable(tableConfig) {
         children: [new Paragraph({
           alignment: AlignmentType.CENTER,
           spacing: { after: 0 },
-          children: [new TextRun({ text: String(cell), font: { ascii: 'Times New Roman', eastAsia: '宋体' }, size: 21 })],
+          children: [new TextRun({ text: String(cell), font: FONT, size: 21 })],
         })],
       })),
     })
@@ -123,6 +142,7 @@ function createDataTable(tableConfig) {
 
   const table = new Table({
     width: { size: 9000, type: WidthType.DXA },
+    alignment: AlignmentType.CENTER,
     columnWidths: colWidths,
     rows: [headerRow, ...dataRows],
   });
@@ -130,8 +150,13 @@ function createDataTable(tableConfig) {
   paragraphs.push(table);
   paragraphs.push(new Paragraph({ spacing: { after: 100 }, children: [] }));
 
+  // 解释文字
+  paragraphs.push(...explainParagraph(explain));
+
   return paragraphs;
 }
+
+// ── 图片加载（支持 explain 字段）─────────────────────
 
 function loadImage(imgConfig, configDir) {
   if (!imgConfig) return [];
@@ -171,10 +196,13 @@ function loadImage(imgConfig, configDir) {
   if (caption) {
     paragraphs.push(new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { after: 200 },
-      children: [new TextRun({ text: caption, font: { ascii: 'Times New Roman', eastAsia: '宋体' }, size: 20 })],
+      spacing: { after: 100 },
+      children: [new TextRun({ text: caption, font: FONT, size: 20 })],
     }));
   }
+
+  // 解释文字
+  paragraphs.push(...explainParagraph(imgConfig.explain));
 
   return paragraphs;
 }
@@ -184,24 +212,20 @@ function buildGenericCover(config) {
   const cover = config.cover || {};
   const children = [];
 
-  // 顶部留白
   for (let i = 0; i < (cover.spacer || 3); i++) children.push(emptyLine());
 
-  // 封面标题（如"实验报告"、"课程报告"等）
   if (cover.title) {
     children.push(p(cover.title, {
       size: cover.titleSize || 44, bold: true, align: AlignmentType.CENTER, spaceAfter: 400
     }));
   }
 
-  // 副标题
   if (cover.subtitle) {
     children.push(p(cover.subtitle, {
       size: cover.subtitleSize || 28, align: AlignmentType.CENTER, spaceAfter: 300
     }));
   }
 
-  // 信息字段
   if (Array.isArray(cover.fields)) {
     for (const field of cover.fields) {
       if (typeof field === 'string') {
@@ -219,7 +243,6 @@ function buildGenericCover(config) {
     }
   }
 
-  // 底部日期
   if (cover.date) {
     children.push(emptyLine());
     children.push(emptyLine());
@@ -264,31 +287,26 @@ function buildGenericBody(config, sectionImages, sectionTables) {
   const bodySections = config.body_sections || [];
   const children = [];
 
-  // 报告标题
   if (config.title) {
     children.push(p(config.title, {
       size: 32, bold: true, align: AlignmentType.CENTER, spaceBefore: 200, spaceAfter: 200
     }));
   }
 
-  // 日期行
   if (config.date) {
     children.push(p(`日期：${config.date}`, { size: 24, spaceAfter: 200 }));
   }
 
-  // 每个章节作为表格的一行
   const sectionRows = bodySections.map((section, i) => {
     const key = section.key || `section_${i}`;
     const cellChildren = [];
 
-    // 章节标题
     const sectionTitle = section.title || `第${i + 1}节`;
     cellChildren.push(new Paragraph({
       spacing: { after: 120, line: 360 },
-      children: [new TextRun({ text: sectionTitle, bold: true, font: { ascii: 'Times New Roman', eastAsia: '宋体' }, size: 24 })],
+      children: [new TextRun({ text: sectionTitle, bold: true, font: FONT, size: 24 })],
     }));
 
-    // position=start 的表格
     const tablesForSection = sectionTables[key] || (section.tables || []);
     for (const tbl of tablesForSection) {
       if (tbl.position === 'start') {
@@ -296,41 +314,35 @@ function buildGenericBody(config, sectionImages, sectionTables) {
       }
     }
 
-    // 正文内容
     if (section.content) {
       cellChildren.push(...textToParagraphs(section.content));
     }
 
-    // position=end 的表格
     for (const tbl of tablesForSection) {
       if (tbl.position !== 'start') {
         cellChildren.push(...createDataTable(tbl));
       }
     }
 
-    // 图片
     const imgs = sectionImages[key] || [];
     if (imgs.length > 0) {
       cellChildren.push(...imgs);
     }
 
-    // 内嵌子章节
     if (Array.isArray(section.subsections)) {
       for (const sub of section.subsections) {
         cellChildren.push(new Paragraph({
           spacing: { before: 160, after: 80, line: 360 },
-          children: [new TextRun({ text: sub.title, bold: true, font: { ascii: 'Times New Roman', eastAsia: '宋体' }, size: 24 })],
+          children: [new TextRun({ text: sub.title, bold: true, font: FONT, size: 24 })],
         }));
         if (sub.content) {
           cellChildren.push(...textToParagraphs(sub.content));
         }
-        // 子章节的表格
         if (Array.isArray(sub.tables)) {
           for (const tbl of sub.tables) {
             cellChildren.push(...createDataTable(tbl));
           }
         }
-        // 子章节的图片
         if (Array.isArray(sub.images)) {
           for (const img of sub.images) {
             cellChildren.push(...loadImage(img, config._configDir));
@@ -368,7 +380,6 @@ function buildExperimentBody(config, sectionImages, sectionTables) {
   const { title, date, sections } = config;
   const children = [];
 
-  children.push(new Paragraph({ children: [new PageBreak()] }));
   children.push(p(title, {
     size: 32, bold: true, align: AlignmentType.CENTER, spaceBefore: 200, spaceAfter: 200
   }));
@@ -390,7 +401,7 @@ function buildExperimentBody(config, sectionImages, sectionTables) {
 
     cellChildren.push(new Paragraph({
       spacing: { after: 120, line: 360 },
-      children: [new TextRun({ text: titleText, bold: true, font: { ascii: 'Times New Roman', eastAsia: '宋体' }, size: 24 })],
+      children: [new TextRun({ text: titleText, bold: true, font: FONT, size: 24 })],
     }));
 
     const tablesForSection = sectionTables[key] || [];
@@ -436,7 +447,7 @@ function buildExperimentBody(config, sectionImages, sectionTables) {
   const thoughtCellChildren = [];
   thoughtCellChildren.push(new Paragraph({
     spacing: { after: 120, line: 360 },
-    children: [new TextRun({ text: '相关思考题及解答', bold: true, font: { ascii: 'Times New Roman', eastAsia: '宋体' }, size: 24 })],
+    children: [new TextRun({ text: '相关思考题及解答', bold: true, font: FONT, size: 24 })],
   }));
   if (sections.thought_questions) {
     thoughtCellChildren.push(...textToParagraphs(sections.thought_questions));
@@ -463,6 +474,39 @@ function buildExperimentBody(config, sectionImages, sectionTables) {
   return children;
 }
 
+// ── 封面模板合并（调用 Python 脚本）──────────────────
+
+function mergeCoverTemplate(templatePath, bodyDocxPath, outputPath) {
+  // 查找 merge-cover.py 脚本
+  const scriptDir = path.dirname(path.resolve(__filename || __dirname));
+  const scriptPath = path.join(scriptDir, 'merge-cover.py');
+
+  if (!fs.existsSync(scriptPath)) {
+    console.warn(`警告: merge-cover.py 未找到，跳过封面模板合并`);
+    return false;
+  }
+
+  try {
+    execSync(`python3 "${scriptPath}" "${templatePath}" "${bodyDocxPath}" "${outputPath}"`, {
+      stdio: 'pipe',
+      timeout: 30000,
+    });
+    return true;
+  } catch (err) {
+    // 尝试 python（Windows）
+    try {
+      execSync(`python "${scriptPath}" "${templatePath}" "${bodyDocxPath}" "${outputPath}"`, {
+        stdio: 'pipe',
+        timeout: 30000,
+      });
+      return true;
+    } catch (err2) {
+      console.error(`封面模板合并失败: ${err2.message}`);
+      return false;
+    }
+  }
+}
+
 // ── 主函数 ──────────────────────────────────────────
 
 /**
@@ -482,6 +526,7 @@ async function generateReport(configPath) {
 
   const isGeneric = config.mode === 'generic';
   const font = config.font || { ascii: 'Times New Roman', eastAsia: '宋体' };
+  const coverTemplate = config.cover_template || null;
 
   // ── 收集图片 ──────────────────────────────────────
   const sectionImages = {};
@@ -519,7 +564,6 @@ async function generateReport(configPath) {
 
   // ── 页眉页脚 ──────────────────────────────────────
   const headerText = config.header || config.title || '';
-  const footerFormat = config.footer_format || '第 {page} 页';
 
   // ── 组装文档 ──────────────────────────────────────
   const pageWidth = config.page_width || 11906;
@@ -571,10 +615,38 @@ async function generateReport(configPath) {
     ],
   });
 
-  const buffer = await Packer.toBuffer(doc);
   const outPath = config.output_path || '报告.docx';
-  fs.writeFileSync(outPath, buffer);
-  console.log(`报告已生成: ${outPath} (${(buffer.length / 1024).toFixed(1)} KB)`);
+  const finalPath = path.resolve(configDir, outPath);
+
+  if (coverTemplate) {
+    // 有封面模板：先生成临时文件，再合并
+    const templateFullPath = path.resolve(configDir, coverTemplate);
+    if (!fs.existsSync(templateFullPath)) {
+      console.error(`错误: 封面模板不存在: ${templateFullPath}`);
+      process.exit(1);
+    }
+
+    const tmpPath = finalPath + '.tmp.docx';
+    const buffer = await Packer.toBuffer(doc);
+    fs.writeFileSync(tmpPath, buffer);
+
+    const merged = mergeCoverTemplate(templateFullPath, tmpPath, finalPath);
+    if (merged) {
+      fs.unlinkSync(tmpPath);
+      const stats = fs.statSync(finalPath);
+      console.log(`报告已生成: ${outPath} (${(stats.size / 1024).toFixed(1)} KB) [使用封面模板]`);
+    } else {
+      // 合并失败，使用原始文件
+      fs.renameSync(tmpPath, finalPath);
+      const stats = fs.statSync(finalPath);
+      console.log(`报告已生成: ${outPath} (${(stats.size / 1024).toFixed(1)} KB) [封面模板合并失败，使用自动生成封面]`);
+    }
+  } else {
+    // 无封面模板：直接生成
+    const buffer = await Packer.toBuffer(doc);
+    fs.writeFileSync(finalPath, buffer);
+    console.log(`报告已生成: ${outPath} (${(buffer.length / 1024).toFixed(1)} KB)`);
+  }
 }
 
 // ── CLI 直接运行 ────────────────────────────────────

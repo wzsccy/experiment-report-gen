@@ -1,4 +1,5 @@
 {
+  "cover_template": null,
   "title": "基于CNN的CIFAR-10图像分类实验",
   "student_name": "张三",
   "student_id": "20240000001",
@@ -21,17 +22,20 @@
     {
       "path": "output/curves.png",
       "caption": "图 1 训练Loss与Accuracy曲线",
+      "explain": "上图展示了训练过程中损失和准确率的变化趋势。训练损失持续下降，测试损失在后期趋于平稳，说明模型收敛良好。",
       "section": "results"
     },
     {
       "path": "output/predictions.png",
       "caption": "图 2 测试集预测结果",
+      "explain": "上图展示了模型在测试集上的预测结果。蓝色框表示预测正确，红色框表示预测错误。",
       "section": "content"
     }
   ],
   "tables": [
     {
       "caption": "表 1 模型超参数配置",
+      "explain": "上表列出了本实验所使用的全部超参数配置。学习率0.001是Adam优化器的默认值，Batch Size 128兼顾了训练速度和显存占用。",
       "section": "content",
       "position": "start",
       "headers": ["超参数", "值", "说明"],

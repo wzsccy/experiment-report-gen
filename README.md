@@ -7,7 +7,7 @@
 
 ## 安装
 
-### 方式一：npm 安装（需要发布到 npm）
+### 方式一：npm 安装
 
 ```bash
 npm install -g experiment-report-gen
@@ -59,6 +59,8 @@ curl -o .claude/skills/experiment-report/SKILL.md https://raw.githubusercontent.
 - 支持图像分类和文本分类两种实验类型的自动分析
 - 支持 CLI 命令行和 Node.js 编程两种使用方式
 - 支持自定义封面、章节、子章节、表格、图片
+- **v2.0 新增**：支持封面模板（`cover_template`），提取已有报告的封面页
+- **v2.0 新增**：表格和图片支持 `explain` 字段，自动生成解释文字
 
 ## CLI 用法
 
@@ -174,6 +176,7 @@ const text = analyzeResults('output/results.json', 'image');
 
 ```json
 {
+  "cover_template": null,
   "title": "实验标题",
   "student_name": "姓名",
   "student_id": "学号",
@@ -193,12 +196,13 @@ const text = analyzeResults('output/results.json', 'image');
     "thought_questions": "相关思考题及解答"
   },
   "images": [
-    { "path": "output/curves.png", "caption": "图 1 训练曲线", "section": "results" }
+    { "path": "output/curves.png", "caption": "图 1 训练曲线", "explain": "解释文字...", "section": "results" }
   ],
   "tables": [
     {
       "caption": "表 1 数据对比",
       "section": "results",
+      "explain": "解释文字...",
       "headers": ["指标", "值"],
       "rows": [["准确率", "92.5%"]]
     }
@@ -212,6 +216,7 @@ const text = analyzeResults('output/results.json', 'image');
 
 | 字段 | 必填 | 说明 |
 |------|------|------|
+| `cover_template` | 否 | 封面模板 docx 路径，`null` 使用自动生成封面 |
 | `title` | 是 | 实验标题 |
 | `student_name` | 是 | 学生姓名 |
 | `student_id` | 是 | 学号 |
@@ -234,6 +239,7 @@ const text = analyzeResults('output/results.json', 'image');
 
 - `path`: 图片路径（相对于 config.json 所在目录）
 - `caption`: 图注文字
+- `explain`: 图片下方的解释文字（可选）
 - `section`: 所属章节的 key
 - `width` / `height`: 图片尺寸（像素），默认 450x300
 
@@ -242,6 +248,7 @@ const text = analyzeResults('output/results.json', 'image');
 - `caption`: 表格标题
 - `headers`: 表头数组
 - `rows`: 数据二维数组
+- `explain`: 表格下方的解释文字（可选）
 - `section`: 所属章节的 key（通用模式下也可写在章节对象内）
 - `position`: 位置，`start`（章节标题后）或默认 `end`（正文后、图片前）
 
