@@ -1,5 +1,5 @@
 {
-  "cover_template": null,
+  "cover_template": "../experiment-report/templates/实验报告样本.docx",
   "title": "基于CNN的CIFAR-10图像分类实验",
   "student_name": "张三",
   "student_id": "20240000001",

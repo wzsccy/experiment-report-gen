@@ -25,10 +25,36 @@ const {
 } = require('docx');
 
 // ── 辅助函数 ──────────────────────────────────────────
-const SINGLE_BORDER = { style: BorderStyle.SINGLE, size: 1, color: '000000' };
+const SINGLE_BORDER = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
 const SINGLE_BORDERS = { top: SINGLE_BORDER, bottom: SINGLE_BORDER, left: SINGLE_BORDER, right: SINGLE_BORDER };
+const NONE_BORDER = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+const NONE_BORDERS = { top: NONE_BORDER, bottom: NONE_BORDER, left: NONE_BORDER, right: NONE_BORDER };
 
 const FONT = { ascii: 'Times New Roman', eastAsia: '宋体' };
+
+// ── 外层模块表格常量 ─────────────────────────────────
+const MODULE_TABLE_WIDTH = 9000;
+const MODULE_CELL_MARGINS = { top: 80, bottom: 80, left: 150, right: 150 };
+// 内容数据表格宽度 = 模块宽度 - 单元格左右边距
+const DATA_TABLE_WIDTH = 8700;
+
+/**
+ * 创建外层模块行（章节容器行）
+ * 注意：不设置 cantSplit，允许内容自然跨页
+ */
+function createOuterSectionRow(cellChildren) {
+  return new TableRow({
+    children: [
+      new TableCell({
+        borders: SINGLE_BORDERS,
+        width: { size: MODULE_TABLE_WIDTH, type: WidthType.DXA },
+        verticalAlign: 'top',
+        margins: MODULE_CELL_MARGINS,
+        children: cellChildren,
+      }),
+    ],
+  });
+}
 
 function p(text, opts = {}) {
   return new Paragraph({
@@ -80,6 +106,52 @@ function textToParagraphs(text, fontSize = 24) {
   return result;
 }
 
+/**
+ * 将内容文本按 "4.x" / "5.x" 小节标题拆分，标题加粗，正文缩进。
+ */
+function parseContentSubsections(text, fontSize = 24) {
+  if (!text) return [];
+  const result = [];
+  const parts = text.split(/\n(?=\d+\.\d+\s+\S)/);
+
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+
+    const lines = trimmed.split('\n');
+    const firstLine = lines[0].trim();
+    const isHeader = /^\d+\.\d+\s+/.test(firstLine);
+
+    if (isHeader) {
+      result.push(new Paragraph({
+        spacing: { before: 160, after: 80, line: 360 },
+        children: [new TextRun({ text: firstLine, bold: true, font: FONT, size: fontSize })],
+      }));
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line) {
+          result.push(new Paragraph({
+            spacing: { after: 80, line: 360 },
+            indent: { firstLine: 480 },
+            children: [new TextRun({ text: line, font: FONT, size: fontSize })],
+          }));
+        }
+      }
+    } else {
+      for (const line of lines) {
+        if (line.trim()) {
+          result.push(new Paragraph({
+            spacing: { after: 80, line: 360 },
+            indent: { firstLine: 480 },
+            children: [new TextRun({ text: line.trim(), font: FONT, size: fontSize })],
+          }));
+        }
+      }
+    }
+  }
+  return result;
+}
+
 function explainParagraph(text) {
   if (!text) return [];
   return [new Paragraph({
@@ -89,7 +161,7 @@ function explainParagraph(text) {
   })];
 }
 
-// ── 数据表格（无蓝色表头，居中）─────────────────────
+// ── 内容数据表格（正文中的表1、表2等，非外层模块框）──────────
 
 function createDataTable(tableConfig) {
   const { caption, headers, rows, explain } = tableConfig;
@@ -97,28 +169,27 @@ function createDataTable(tableConfig) {
 
   if (caption) {
     paragraphs.push(new Paragraph({
-      spacing: { before: 200, after: 100 },
+      spacing: { before: 120, after: 60 },
       alignment: AlignmentType.CENTER,
       children: [new TextRun({ text: caption, bold: true, font: FONT, size: 21 })],
     }));
   }
 
   const colCount = headers.length;
-  const colWidth = Math.floor(9000 / colCount);
+  const colWidth = Math.floor(DATA_TABLE_WIDTH / colCount);
   const colWidths = Array(colCount).fill(colWidth);
-  colWidths[colCount - 1] = 9000 - colWidth * (colCount - 1);
+  colWidths[colCount - 1] = DATA_TABLE_WIDTH - colWidth * (colCount - 1);
 
-  // 表头行（无蓝色背景，仅加粗）
   const headerRow = new TableRow({
     tableHeader: true,
     children: headers.map((h, idx) => new TableCell({
       borders: SINGLE_BORDERS,
       width: { size: colWidths[idx], type: WidthType.DXA },
       verticalAlign: 'center',
-      margins: { top: 40, bottom: 40, left: 80, right: 80 },
+      margins: { top: 40, bottom: 40, left: 60, right: 60 },
       children: [new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { after: 0 },
+        spacing: { after: 0, line: 276 },
         children: [new TextRun({ text: h, bold: true, font: FONT, size: 21 })],
       })],
     })),
@@ -130,10 +201,10 @@ function createDataTable(tableConfig) {
         borders: SINGLE_BORDERS,
         width: { size: colWidths[idx], type: WidthType.DXA },
         verticalAlign: 'center',
-        margins: { top: 40, bottom: 40, left: 80, right: 80 },
+        margins: { top: 40, bottom: 40, left: 60, right: 60 },
         children: [new Paragraph({
           alignment: AlignmentType.CENTER,
-          spacing: { after: 0 },
+          spacing: { after: 0, line: 276 },
           children: [new TextRun({ text: String(cell), font: FONT, size: 21 })],
         })],
       })),
@@ -141,14 +212,14 @@ function createDataTable(tableConfig) {
   );
 
   const table = new Table({
-    width: { size: 9000, type: WidthType.DXA },
+    width: { size: DATA_TABLE_WIDTH, type: WidthType.DXA },
     alignment: AlignmentType.CENTER,
     columnWidths: colWidths,
     rows: [headerRow, ...dataRows],
+    borders: SINGLE_BORDERS,
   });
 
   paragraphs.push(table);
-  paragraphs.push(new Paragraph({ spacing: { after: 100 }, children: [] }));
 
   // 解释文字
   paragraphs.push(...explainParagraph(explain));
@@ -156,7 +227,7 @@ function createDataTable(tableConfig) {
   return paragraphs;
 }
 
-// ── 图片加载（支持 explain 字段）─────────────────────
+// ── 图片加载 ──────────────────────────────────────────
 
 function loadImage(imgConfig, configDir) {
   if (!imgConfig) return [];
@@ -179,10 +250,10 @@ function loadImage(imgConfig, configDir) {
   const height = imgConfig.height || 300;
 
   const paragraphs = [];
-  paragraphs.push(new Paragraph({ spacing: { before: 200 }, children: [] }));
+  // 图片段落：直接用段前间距，不用空段落
   paragraphs.push(new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { after: 60 },
+    spacing: { before: 80, after: 60 },
     children: [
       new ImageRun({
         type: imgType,
@@ -289,12 +360,12 @@ function buildGenericBody(config, sectionImages, sectionTables) {
 
   if (config.title) {
     children.push(p(config.title, {
-      size: 32, bold: true, align: AlignmentType.CENTER, spaceBefore: 200, spaceAfter: 200
+      size: 32, bold: true, align: AlignmentType.CENTER, spaceBefore: 0, spaceAfter: 100
     }));
   }
 
   if (config.date) {
-    children.push(p(`日期：${config.date}`, { size: 24, spaceAfter: 200 }));
+    children.push(p(`日期：${config.date}`, { size: 24, spaceAfter: 60 }));
   }
 
   const sectionRows = bodySections.map((section, i) => {
@@ -303,7 +374,7 @@ function buildGenericBody(config, sectionImages, sectionTables) {
 
     const sectionTitle = section.title || `第${i + 1}节`;
     cellChildren.push(new Paragraph({
-      spacing: { after: 120, line: 360 },
+      spacing: { after: 80, line: 360 },
       children: [new TextRun({ text: sectionTitle, bold: true, font: FONT, size: 24 })],
     }));
 
@@ -351,23 +422,16 @@ function buildGenericBody(config, sectionImages, sectionTables) {
       }
     }
 
-    return new TableRow({
-      children: [
-        new TableCell({
-          borders: SINGLE_BORDERS,
-          width: { size: 9000, type: WidthType.DXA },
-          margins: { top: 100, bottom: 100, left: 150, right: 150 },
-          children: cellChildren,
-        }),
-      ],
-    });
+    return createOuterSectionRow(cellChildren);
   });
 
   if (sectionRows.length > 0) {
     const mainTable = new Table({
-      width: { size: 9000, type: WidthType.DXA },
-      columnWidths: [9000],
+      width: { size: MODULE_TABLE_WIDTH, type: WidthType.DXA },
+      alignment: AlignmentType.CENTER,
+      columnWidths: [MODULE_TABLE_WIDTH],
       rows: sectionRows,
+      borders: SINGLE_BORDERS,
     });
     children.push(mainTable);
   }
@@ -376,14 +440,16 @@ function buildGenericBody(config, sectionImages, sectionTables) {
 }
 
 // ── 实验报告模式: 构建正文 (向后兼容) ──────────────
+
 function buildExperimentBody(config, sectionImages, sectionTables) {
   const { title, date, sections } = config;
   const children = [];
 
+  // 标题段落
   children.push(p(title, {
-    size: 32, bold: true, align: AlignmentType.CENTER, spaceBefore: 200, spaceAfter: 200
+    size: 32, bold: true, align: AlignmentType.CENTER, spaceBefore: 0, spaceAfter: 100
   }));
-  children.push(p(`实验时间：${date || ''}`, { size: 24, spaceAfter: 200 }));
+  children.push(p(`实验时间：${date || ''}`, { size: 24, spaceAfter: 60 }));
 
   const sectionTitles = [
     '一、实验目的和要求',
@@ -399,11 +465,13 @@ function buildExperimentBody(config, sectionImages, sectionTables) {
     const content = sections[key] || '';
     const cellChildren = [];
 
+    // 章节标题段落
     cellChildren.push(new Paragraph({
-      spacing: { after: 120, line: 360 },
+      spacing: { after: 80, line: 360 },
       children: [new TextRun({ text: titleText, bold: true, font: FONT, size: 24 })],
     }));
 
+    // position=start 的内容表格
     const tablesForSection = sectionTables[key] || [];
     for (const tbl of tablesForSection) {
       if (tbl.position === 'start') {
@@ -411,65 +479,48 @@ function buildExperimentBody(config, sectionImages, sectionTables) {
       }
     }
 
-    cellChildren.push(...textToParagraphs(content));
+    // 正文内容
+    if (key === 'content' || key === 'results') {
+      cellChildren.push(...parseContentSubsections(content));
+    } else {
+      cellChildren.push(...textToParagraphs(content));
+    }
 
+    // position!=start 的内容表格
     for (const tbl of tablesForSection) {
       if (tbl.position !== 'start') {
         cellChildren.push(...createDataTable(tbl));
       }
     }
 
+    // 图片
     if (sectionImages[key] && sectionImages[key].length > 0) {
       cellChildren.push(...sectionImages[key]);
     }
 
-    return new TableRow({
-      children: [
-        new TableCell({
-          borders: SINGLE_BORDERS,
-          width: { size: 9000, type: WidthType.DXA },
-          margins: { top: 100, bottom: 100, left: 150, right: 150 },
-          children: cellChildren,
-        }),
-      ],
-    });
+    return createOuterSectionRow(cellChildren);
   });
 
-  const mainTable = new Table({
-    width: { size: 9000, type: WidthType.DXA },
-    columnWidths: [9000],
-    rows: sectionRows,
-  });
-  children.push(mainTable);
-
-  // 思考题
-  children.push(emptyLine());
+  // 思考题：作为 mainTable 的最后一行，不是单独的表格
   const thoughtCellChildren = [];
   thoughtCellChildren.push(new Paragraph({
-    spacing: { after: 120, line: 360 },
+    spacing: { after: 80, line: 360 },
     children: [new TextRun({ text: '相关思考题及解答', bold: true, font: FONT, size: 24 })],
   }));
   if (sections.thought_questions) {
     thoughtCellChildren.push(...textToParagraphs(sections.thought_questions));
   }
+  sectionRows.push(createOuterSectionRow(thoughtCellChildren));
 
-  const thoughtTable = new Table({
-    width: { size: 9000, type: WidthType.DXA },
-    columnWidths: [9000],
-    rows: [
-      new TableRow({
-        children: [
-          new TableCell({
-            borders: SINGLE_BORDERS,
-            width: { size: 9000, type: WidthType.DXA },
-            margins: { top: 100, bottom: 100, left: 150, right: 150 },
-            children: thoughtCellChildren,
-          }),
-        ],
-      }),
-    ],
+  // 一个主表格包含所有外层模块（含思考题）
+  const mainTable = new Table({
+    width: { size: MODULE_TABLE_WIDTH, type: WidthType.DXA },
+    alignment: AlignmentType.CENTER,
+    columnWidths: [MODULE_TABLE_WIDTH],
+    rows: sectionRows,
+    borders: SINGLE_BORDERS,
   });
-  children.push(thoughtTable);
+  children.push(mainTable);
 
   return children;
 }
@@ -477,7 +528,6 @@ function buildExperimentBody(config, sectionImages, sectionTables) {
 // ── 封面模板合并（调用 Python 脚本）──────────────────
 
 function mergeCoverTemplate(templatePath, bodyDocxPath, outputPath) {
-  // 查找 merge-cover.py 脚本
   const scriptDir = path.dirname(path.resolve(__filename || __dirname));
   const scriptPath = path.join(scriptDir, 'merge-cover.py');
 
@@ -493,7 +543,6 @@ function mergeCoverTemplate(templatePath, bodyDocxPath, outputPath) {
     });
     return true;
   } catch (err) {
-    // 尝试 python（Windows）
     try {
       execSync(`python "${scriptPath}" "${templatePath}" "${bodyDocxPath}" "${outputPath}"`, {
         stdio: 'pipe',
@@ -509,16 +558,6 @@ function mergeCoverTemplate(templatePath, bodyDocxPath, outputPath) {
 
 // ── 主函数 ──────────────────────────────────────────
 
-/**
- * 从 config 生成 .docx 报告
- *
- * 支持两种模式:
- *   - mode: "generic" — 完全自定义封面和章节
- *   - 默认 (experiment) — 向后兼容实验报告格式
- *
- * @param {string} configPath - config.json 的路径
- * @returns {Promise<void>}
- */
 async function generateReport(configPath) {
   const configDir = path.dirname(path.resolve(configPath));
   const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
@@ -568,7 +607,69 @@ async function generateReport(configPath) {
   // ── 组装文档 ──────────────────────────────────────
   const pageWidth = config.page_width || 11906;
   const pageHeight = config.page_height || 16838;
-  const margin = config.margin || 1440;
+  const baseMargin = config.margin || 1440;
+  // 正文区域页边距：top 加大，避免跨页后内容贴住页眉
+  const topMargin = config.top_margin || 1800;
+  const bottomMargin = config.bottom_margin || baseMargin;
+  const leftMargin = config.left_margin || baseMargin;
+  const rightMargin = config.right_margin || baseMargin;
+  // 页眉/页脚距页面边缘距离
+  const headerMargin = config.header_margin || 720;
+  const footerMargin = config.footer_margin || 720;
+
+  const pageMargin = {
+    top: topMargin,
+    right: rightMargin,
+    bottom: bottomMargin,
+    left: leftMargin,
+    header: headerMargin,
+    footer: footerMargin,
+  };
+
+  const bodySection = {
+    properties: {
+      page: {
+        size: { width: pageWidth, height: pageHeight },
+        margin: pageMargin,
+      },
+    },
+    headers: {
+      default: new Header({
+        children: [p(headerText, { size: 18, align: AlignmentType.CENTER })],
+      }),
+    },
+    footers: {
+      default: new Footer({
+        children: [pMulti(
+          [{ text: '第 ', size: 18 }, { children: [PageNumber.CURRENT], size: 18 }, { text: ' 页', size: 18 }],
+          { align: AlignmentType.CENTER }
+        )],
+      }),
+    },
+    children: bodyChildren,
+  };
+
+  const coverPageMargin = {
+    top: baseMargin,
+    right: baseMargin,
+    bottom: baseMargin,
+    left: baseMargin,
+  };
+
+  const sections = coverTemplate
+    ? [bodySection]
+    : [
+        {
+          properties: {
+            page: {
+              size: { width: pageWidth, height: pageHeight },
+              margin: coverPageMargin,
+            },
+          },
+          children: coverChildren,
+        },
+        bodySection,
+      ];
 
   const doc = new Document({
     styles: {
@@ -578,48 +679,13 @@ async function generateReport(configPath) {
         },
       },
     },
-    sections: [
-      // 封面
-      {
-        properties: {
-          page: {
-            size: { width: pageWidth, height: pageHeight },
-            margin: { top: margin, right: margin, bottom: margin, left: margin },
-          },
-        },
-        children: coverChildren,
-      },
-      // 正文
-      {
-        properties: {
-          page: {
-            size: { width: pageWidth, height: pageHeight },
-            margin: { top: margin, right: margin, bottom: margin, left: margin },
-          },
-        },
-        headers: {
-          default: new Header({
-            children: [p(headerText, { size: 18, align: AlignmentType.CENTER })],
-          }),
-        },
-        footers: {
-          default: new Footer({
-            children: [pMulti(
-              [{ text: '第 ', size: 18 }, { children: [PageNumber.CURRENT], size: 18 }, { text: ' 页', size: 18 }],
-              { align: AlignmentType.CENTER }
-            )],
-          }),
-        },
-        children: bodyChildren,
-      },
-    ],
+    sections,
   });
 
   const outPath = config.output_path || '报告.docx';
   const finalPath = path.resolve(configDir, outPath);
 
   if (coverTemplate) {
-    // 有封面模板：先生成临时文件，再合并
     const templateFullPath = path.resolve(configDir, coverTemplate);
     if (!fs.existsSync(templateFullPath)) {
       console.error(`错误: 封面模板不存在: ${templateFullPath}`);
@@ -636,13 +702,11 @@ async function generateReport(configPath) {
       const stats = fs.statSync(finalPath);
       console.log(`报告已生成: ${outPath} (${(stats.size / 1024).toFixed(1)} KB) [使用封面模板]`);
     } else {
-      // 合并失败，使用原始文件
       fs.renameSync(tmpPath, finalPath);
       const stats = fs.statSync(finalPath);
       console.log(`报告已生成: ${outPath} (${(stats.size / 1024).toFixed(1)} KB) [封面模板合并失败，使用自动生成封面]`);
     }
   } else {
-    // 无封面模板：直接生成
     const buffer = await Packer.toBuffer(doc);
     fs.writeFileSync(finalPath, buffer);
     console.log(`报告已生成: ${outPath} (${(buffer.length / 1024).toFixed(1)} KB)`);

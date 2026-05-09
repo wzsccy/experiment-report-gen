@@ -29,6 +29,61 @@ def qn(tag):
     return f'{{{NS[prefix]}}}{local}'
 
 
+def _extract_last_section(body_elem):
+    """从 body 元素中提取最后一个 section 的内容（不含 sectPr）。
+
+    如果文档有多个 section（封面+正文），只取最后一个 section。
+    """
+    # 查找所有 sectPr：直接子元素 或 嵌套在 w:p/w:pPr 中
+    first_sectpr_para = None
+    first_sectpr_direct = None
+
+    for child in body_elem:
+        if child.tag == qn('w:sectPr'):
+            first_sectpr_direct = child
+            break
+        if child.tag == qn('w:p'):
+            pPr = child.find(qn('w:pPr'))
+            if pPr is not None and pPr.find(qn('w:sectPr')) is not None:
+                first_sectpr_para = child
+                break
+
+    # 如果没有找到 section break，返回所有内容（单 section 文档）
+    if first_sectpr_para is None and first_sectpr_direct is None:
+        children = list(body_elem)
+        last_sectpr = body_elem.find(qn('w:sectPr'))
+        if last_sectpr is not None:
+            children.remove(last_sectpr)
+        return children
+
+    # 单 section 文档：sectPr 是 w:body 的最后一个直接子元素
+    # 所有内容都在 sectPr 之前，直接返回（去掉 sectPr）
+    if first_sectpr_direct is not None:
+        children = list(body_elem)
+        children.remove(first_sectpr_direct)
+        return children
+
+    # 多 section 文档：sectPr 嵌套在段落中（封面结束标志）
+    # 取该段落之后的内容
+    result = []
+    found = False
+    for child in list(body_elem):
+        if not found:
+            if child is first_sectpr_para:
+                found = True
+                # 保留段落文本但去掉 sectPr
+                pPr = child.find(qn('w:pPr'))
+                sectPr = pPr.find(qn('w:sectPr'))
+                pPr.remove(sectPr)
+                result.append(child)
+            continue
+        if child.tag == qn('w:sectPr'):
+            continue  # 跳过末尾的 sectPr
+        result.append(child)
+
+    return result
+
+
 def main():
     if len(sys.argv) < 4:
         print('用法: python merge-cover.py <模板.docx> <正文.docx> <输出.docx>')
@@ -89,8 +144,9 @@ def main():
         shutil.rmtree(body_dir, ignore_errors=True)
         sys.exit(1)
 
-    # ── 清除模板正文（保留封面）──
-    # 删除分节符之后的所有元素（保留 body 末尾的 sectPr）
+    # ── 清除模板正文（保留封面和分节符）──
+    # 删除分节符之后、last_sectPr 之前的所有元素
+    # 保留分节符段落，它是封面和正文的分界线
     last_sectPr = tpl_body.find(qn('w:sectPr'))
 
     to_remove = []
@@ -98,23 +154,44 @@ def main():
     for child in list(tpl_body):
         if child is sect_break_para:
             found_break = True
-            # 分节符段落本身也要删除（封面不需要它）
-            to_remove.append(child)
-            continue
+            continue  # 保留分节符段落
         if found_break and child is not last_sectPr:
             to_remove.append(child)
 
     for elem in to_remove:
         tpl_body.remove(elem)
 
-    # ── 从正文文档中提取所有内容 ──
-    # 正文文档的第一个 section 的内容（标题、日期、表格等）
-    body_children = list(body_body)
+    # ── 从正文文档中提取 body section 的内容 ──
+    # 如果正文有多个 section（封面+正文），只取最后一个 section 的内容
+    body_children = _extract_last_section(body_body)
 
-    # 移除正文的 sectPr（我们用模板的）
+    # ── 从正文文档中提取 sectPr 的页面属性（页边距、页眉页脚距离等）──
+    # 正文文档的 sectPr 包含 generateReport() 设置的自定义页边距，
+    # 需要合并到模板的 last_sectPr 中，否则模板的默认边距会覆盖自定义设置
     body_sectPr = body_body.find(qn('w:sectPr'))
     if body_sectPr is not None:
-        body_children.remove(body_sectPr)
+        # 提取正文 sectPr 中的 pgMar（页边距）
+        body_pgMar = body_sectPr.find(qn('w:pgMar'))
+        if body_pgMar is not None:
+            tpl_pgMar = last_sectPr.find(qn('w:pgMar'))
+            if tpl_pgMar is not None:
+                # 用正文的页边距覆盖模板的页边距
+                for attr in ['top', 'right', 'bottom', 'left', 'header', 'footer', 'gutter']:
+                    val = body_pgMar.get(qn(f'w:{attr}'))
+                    if val is not None:
+                        tpl_pgMar.set(qn(f'w:{attr}'), val)
+            else:
+                # 模板没有 pgMar，直接添加正文的
+                last_sectPr.append(body_pgMar)
+        # 提取正文 sectPr 中的 pgSz（页面尺寸）
+        body_pgSz = body_sectPr.find(qn('w:pgSz'))
+        if body_pgSz is not None:
+            tpl_pgSz = last_sectPr.find(qn('w:pgSz'))
+            if tpl_pgSz is not None:
+                for attr in ['w', 'h', 'orient']:
+                    val = body_pgSz.get(qn(f'w:{attr}'))
+                    if val is not None:
+                        tpl_pgSz.set(qn(f'w:{attr}'), val)
 
     # ── 将正文内容插入到模板中 ──
     # 在 last_sectPr 之前插入
@@ -197,7 +274,7 @@ def main():
 
         # 保存关系文件
         tpl_rels_tree = etree.ElementTree(tpl_rels_root)
-        tpl_rels_tree.write(tpl_rels_path, xml_declaration=True, encoding='UTF-8', standalone=True)
+        tpl_rels_tree.write(tpl_rels_path, xml_declaration=True, encoding='UTF-8')
 
         # ── 更新 document.xml 中的图片引用 ──
         # 替换正文内容中的 rId
@@ -210,7 +287,7 @@ def main():
 
     # ── 保存结果 ──
     tpl_tree = etree.ElementTree(tpl_root)
-    tpl_tree.write(tpl_doc_path, xml_declaration=True, encoding='UTF-8', standalone=True)
+    tpl_tree.write(tpl_doc_path, xml_declaration=True, encoding='UTF-8')
 
     # 重新打包为 docx
     if os.path.exists(output_path):
