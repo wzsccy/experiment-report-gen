@@ -28,7 +28,7 @@ npm install -g .
 
 ## Claude Code Skill
 
-本包内置了 Claude Code skill（`SKILL.md`），安装后可配合 Claude Code 使用，自动完成从实验要求到报告的全流程。
+本包内置了 Claude Code skill（`SKILL.md`），安装后可配合 Claude Code 使用，自动从 config.json 生成实验报告。
 
 ### 安装 skill
 
@@ -47,10 +47,10 @@ curl -o .claude/skills/experiment-report/SKILL.md https://raw.githubusercontent.
 
 ### 使用
 
-在 Claude Code 中描述你的实验需求即可触发：
+在 Claude Code 中描述你的需求即可触发：
 
-- "帮我生成实验报告，要求用CNN在CIFAR-10上做图像分类"
-- "实验要求.txt在这里，帮我完成实验"
+- "帮我生成实验报告，config.json 已经准备好了"
+- "帮我从 results.json 生成实验报告"
 
 ## 功能
 
