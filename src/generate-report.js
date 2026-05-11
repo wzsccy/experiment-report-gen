@@ -88,9 +88,36 @@ function coverInfoLine(label, value) {
   });
 }
 
+/**
+ * 清理文本中的 markdown 符号，避免它们出现在 docx 中。
+ * - `### ` / `## ` / `# ` 行首标题标记
+ * - `**text**` 加粗标记 → 保留 text
+ * - `- ` 行首列表标记
+ * - 行首 `1. ` / `2. ` 等编号列表标记（仅匹配 1 位数字 + 点 + 空格，避免误删 "4.1"）
+ *
+ * 注意：不用 regex 匹配加粗，因为 Node.js 的 . 在某些版本
+ * 无法正确匹配 CJK 字符，改用 split 方案。
+ */
+function stripMarkdown(text) {
+  if (!text) return '';
+  let result = text
+    // 行首标题标记
+    .replace(/^#{1,4}\s+/gm, '')
+    // 行首无序列表标记 "- "
+    .replace(/^-\s+/gm, '');
+  // 加粗标记 **text** → text（split 方案，避免 Node.js regex CJK bug）
+  if (result.includes('**')) {
+    result = result.split('**').join('');
+  }
+  // 行首有序列表标记 "1. " ~ "9. "（不匹配 "4.1" 这种小节号）
+  result = result.replace(/^(\d)\.\s+/gm, '$1. ');
+  return result;
+}
+
 function textToParagraphs(text, fontSize = 24) {
   const result = [];
-  const blocks = text.split('\n\n');
+  const cleanText = stripMarkdown(text);
+  const blocks = cleanText.split('\n\n');
   for (const block of blocks) {
     const lines = block.split('\n');
     for (const line of lines) {
@@ -111,8 +138,9 @@ function textToParagraphs(text, fontSize = 24) {
  */
 function parseContentSubsections(text, fontSize = 24) {
   if (!text) return [];
+  const cleanText = stripMarkdown(text);
   const result = [];
-  const parts = text.split(/\n(?=\d+\.\d+\s+\S)/);
+  const parts = cleanText.split(/\n(?=\d+\.\d+\s+\S)/);
 
   for (const part of parts) {
     const trimmed = part.trim();
